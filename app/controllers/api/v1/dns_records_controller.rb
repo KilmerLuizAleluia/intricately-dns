@@ -1,10 +1,14 @@
 module Api
   module V1
     class DnsRecordsController < ApplicationController
+      PAGE_SIZE = 30
+
       # GET /dns_records
       def index
+        dns = paginated_dns
+
         json_response = {
-          total_records: DnsRecord.count,
+          total_records: dns.count,
           records: records_json,
           related_hostnames: related_hostnames_json
         }
@@ -20,16 +24,15 @@ module Api
         render json: { id: dns_record.id }, status: :created
       end
 
-      def dns_params
-        params.permit(
-          :page,
-          :included,
-          :excluded,
-          dns_records: [:ip, hostnames_attributes: [:hostname]]
-        )
+      private
+
+      def paginated_dns
+        DnsRecord.all.limit(PAGE_SIZE).offset(page_offset)
       end
 
-      private
+      def page_offset
+        (dns_params[:page].to_i - 1) * PAGE_SIZE
+      end
 
       def records_json
         records = []
@@ -66,6 +69,15 @@ module Api
           model_hostname.dns_records << dns_record
           model_hostname.save!
         }
+      end
+
+      def dns_params
+        params.permit(
+          :page,
+          :included,
+          :excluded,
+          dns_records: [:ip, hostnames_attributes: [:hostname]]
+        )
       end
     end
   end
