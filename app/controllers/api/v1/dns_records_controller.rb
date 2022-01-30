@@ -19,8 +19,11 @@ module Api
 
       # POST /dns_records
       def create
-        dns_record = create_dns
-        create_or_update_hostnames(dns_record)
+        dns_record = CreateDnsRecordService.new(ip: dns_params[:dns_records][:ip]).call
+        CreateOrUpdateHostnamesService.new(
+          dns_record: dns_record,
+          hostnames_attributes: dns_params[:dns_records][:hostnames_attributes]
+        ).call
 
         render json: { id: dns_record.id }, status: :created
       end
@@ -61,20 +64,6 @@ module Api
         }
 
         related_hostnames
-      end
-
-      def create_dns
-        ip = dns_params[:dns_records][:ip]
-        DnsRecord.find_or_create_by!(ip_address: ip)
-      end
-
-      def create_or_update_hostnames(dns_record)
-        hostnames_attributes = dns_params[:dns_records][:hostnames_attributes]
-        hostnames_attributes.each{ |hostname|
-          model_hostname = Hostname.find_or_create_by!(name: hostname[:hostname])
-          model_hostname.dns_records << dns_record
-          model_hostname.save!
-        }
       end
 
       def select_included_hostnames(dns_records)
