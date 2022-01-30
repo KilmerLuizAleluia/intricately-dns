@@ -3,13 +3,19 @@ module Api
     class DnsRecordsController < ApplicationController
       # GET /dns_records
       def index
-        # TODO: Implement this action
+        json_response = {
+          total_records: DnsRecord.count,
+          records: records_json,
+          related_hostnames: related_hostnames_json
+        }
+
+        render json: json_response, status: :ok
       end
 
       # POST /dns_records
       def create
         dns_record = create_dns
-        create_hostnames(dns_record)
+        create_or_update_hostnames(dns_record)
 
         render json: { id: dns_record.id }, status: :created
       end
@@ -25,15 +31,40 @@ module Api
 
       private
 
-      def create_dns
-        ip = dns_params[:dns_records][:ip]
-        DnsRecord.create!(ip_address: ip)
+      def records_json
+        records = []
+        DnsRecord.all.each { |dns|
+          record_json = { id: dns.id, ip_address: dns.ip_address }
+          records << record_json
+        }
+
+        records
       end
 
-      def create_hostnames(dns_record)
+      def related_hostnames_json
+        related_hostnames = []
+        Hostname.all.each { |hostname|
+          json = {
+            count: DnsRecordHostname.where(hostname_id: hostname.id).count,
+            hostname: hostname.name
+          }
+          related_hostnames << json
+        }
+
+        related_hostnames
+      end
+
+      def create_dns
+        ip = dns_params[:dns_records][:ip]
+        DnsRecord.find_or_create_by!(ip_address: ip)
+      end
+
+      def create_or_update_hostnames(dns_record)
         hostnames_attributes = dns_params[:dns_records][:hostnames_attributes]
-        hostnames_attributes.each{ |hn|
-          Hostname.create!(name: hn[:hostname], dns_records: [dns_record])
+        hostnames_attributes.each{ |hostname|
+          model_hostname = Hostname.find_or_create_by!(name: hostname[:hostname])
+          model_hostname.dns_records << dns_record
+          model_hostname.save!
         }
       end
     end
