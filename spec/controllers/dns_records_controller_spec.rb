@@ -349,6 +349,101 @@ RSpec.describe Api::V1::DnsRecordsController, type: :controller do
   end
 
   describe '#create' do
-    # TODO
+    context 'successful response' do
+
+      let(:page) { 1 }
+      let(:ip1) { '1.1.1.1' }
+      let(:ip2) { '2.2.2.2' }
+      let(:lorem) { 'lorem.com' }
+      let(:ipsum) { 'ipsum.com' }
+      let(:dolor) { 'dolor.com' }
+      let(:amet) { 'amet.com' }
+
+      let(:payload1) do
+        {
+          dns_records: {
+            ip: ip1,
+            hostnames_attributes: [
+              {
+                hostname: lorem
+              },
+              {
+                hostname: ipsum
+              },
+              {
+                hostname: dolor
+              },
+              {
+                hostname: amet
+              }
+            ]
+          }
+        }.to_json
+      end
+
+      let(:payload2) do
+        {
+          dns_records: {
+            ip: ip2,
+            hostnames_attributes: [
+              {
+                hostname: ipsum
+              }
+            ]
+          }
+        }.to_json
+      end
+
+      before :each do
+        Hostname.destroy_all
+        DnsRecord.destroy_all
+      end
+
+      context 'with one single hostname' do
+        before :each do
+          request.accept = 'application/json'
+          request.content_type = 'application/json'
+
+          post(:create, body: payload2, format: :json)
+        end
+
+        it 'responds with "created" response code' do
+          expect(response).to have_http_status(:created)
+        end
+
+        it 'returns only new dns id' do
+          expect(parsed_body).to have_key(:id)
+          expect(parsed_body.count).to eq(1)
+        end
+
+        it 'should create one DNS and one Hostname' do
+          expect(Hostname.count).to eq(1)
+          expect(DnsRecord.count).to eq(1)
+        end
+      end
+
+      context 'with multiple hostnames' do
+        before :each do
+          request.accept = 'application/json'
+          request.content_type = 'application/json'
+
+          post(:create, body: payload1, format: :json)
+        end
+
+        it 'responds with "created" response code' do
+          expect(response).to have_http_status(:created)
+        end
+
+        it 'returns only new dns id' do
+          expect(parsed_body).to have_key(:id)
+          expect(parsed_body.count).to eq(1)
+        end
+
+        it 'should create one DNS and four Hostnames' do
+          expect(Hostname.count).to eq(4)
+          expect(DnsRecord.count).to eq(1)
+        end
+      end
+    end
   end
 end
