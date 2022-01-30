@@ -6,92 +6,48 @@ module Api
       # GET /dns_records
       def index
         return render status: :unprocessable_entity if dns_params[:page].nil?
-        dns = paginated_dns
 
-        json_response = {
-          total_records: dns.count,
-          records: records_json(dns),
-          related_hostnames: related_hostnames_json(dns)
-        }
+        dns_records = call_paginated_dns_service
+        json_response = call_build_index_json_service(dns_records)
 
         render json: json_response, status: :ok
       end
 
       # POST /dns_records
       def create
-        dns_record = CreateDnsRecordService.new(ip: dns_params[:dns_records][:ip]).call
-        CreateOrUpdateHostnamesService.new(
-          dns_record: dns_record,
-          hostnames_attributes: dns_params[:dns_records][:hostnames_attributes]
-        ).call
+        dns_record = call_create_dns_service
+        call_create_or_update_hostnames_service(dns_record)
 
         render json: { id: dns_record.id }, status: :created
       end
 
       private
 
-      def paginated_dns
-        dns_records = DnsRecord.all.limit(PAGE_SIZE).offset(page_offset)
-        dns_records = select_included_hostnames(dns_records) if dns_params[:included].present?
-        dns_records = reject_excluded_hostnames(dns_records) if dns_params[:excluded].present?
-
-        dns_records
+      def call_paginated_dns_service
+        RetrievePaginatedDnsService.new(
+          page_size: PAGE_SIZE,
+          page: dns_params[:page],
+          included: dns_params[:included],
+          excluded: dns_params[:excluded]
+        ).call
       end
 
-      def records_json(dns)
-        records = []
-        dns.each { |dns|
-          record_json = { id: dns.id, ip_address: dns.ip_address }
-          records << record_json
-        }
-
-        records
+      def call_build_index_json_service(dns_records)
+        BuildIndexJsonService.new(
+          dns_records: dns_records,
+          included: dns_params[:included]
+        ).call
       end
 
-      def related_hostnames_json(dns)
-        hn_ids = []
-        related_hostnames = []
-        dns.each { |d| hn_ids << d.hostname_ids }
-        hn_frequencies = hn_ids.flatten.tally
-
-        hn_frequencies.each { |hn|
-          next if included_ids.include?(hn[0])
-          json = {
-            count: hn[1],
-            hostname: Hostname.find(hn[0]).name
-          }
-          related_hostnames << json
-        }
-
-        related_hostnames
+      def call_create_dns_service
+        CreateDnsRecordService.new(ip: dns_params[:dns_records][:ip]).call
       end
 
-      def select_included_hostnames(dns_records)
-        dns_records.select { |dns|
-          ((included_ids) - dns.hostname_ids).empty?
-        }
-      end
-
-      def reject_excluded_hostnames(dns_records)
-        dns_records.reject  { |dns|
-          (excluded_ids & dns.hostname_ids).present?
-        }
-      end
-
-      def included_ids
-        return [] unless dns_params[:included].present?
-        names = dns_params[:included]&.split(',')
-        names.map { |name| Hostname.find_by(name: name).id }
-      end
-
-      def excluded_ids
-        return [] unless dns_params[:excluded].present?
-        names = dns_params[:excluded]&.split(',')
-        names.map { |name| Hostname.find_by(name: name).id }
-      end
-
-      def page_offset
-        (dns_params[:page].to_i - 1) * PAGE_SIZE
+      def call_create_or_update_hostnames_service(dns_record)
+        CreateOrUpdateHostnamesService.new(
+          dns_record: dns_record,
+          hostnames_attributes: dns_params[:dns_records][:hostnames_attributes]
+        ).call
       end
 
       def dns_params
