@@ -147,3 +147,9 @@ curl --request GET \
   --url 'http://localhost:3000/dns_records?included=ipsum.com,dolor.com&excluded=sit.com' \
   --header 'content-type: application/json'
 ```
+
+
+# TODO
+* Update code for deailng with some failing scenarios (e.g. invalid IPV4):
+* Add rubocop for static code analysis;
+* Add more specs for #create and #index endpoints for alternatives scenarios (e.g. creating already existing DNS).
